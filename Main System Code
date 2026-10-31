@@ -43,6 +43,9 @@ controller Controller1 = controller(primary);
 optical ColorSensor = optical(PORT7);
 digital_out MatchLoader = digital_out(Brain.ThreeWirePort.G);
 digital_out BottomGoal = digital_out(Brain.ThreeWirePort.B);
+
+//Odometry system Sensor Declarations///////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 rotation VerticalOdomWheel = rotation(PORT11, true);
 
 rotation HorizontalOdomWheel = rotation(PORT12, false);
