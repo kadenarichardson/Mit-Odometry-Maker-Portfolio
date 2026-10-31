@@ -268,7 +268,7 @@ competition Competition;
     } 
 
   
-//Odometry
+//Odometry block///////////////////////////////////////
   void Odometry() {
   //estabishes the variables that are only used in this function
     double DeltaXLocal = 0;
@@ -352,6 +352,10 @@ competition Competition;
   wait(5,msec); 
   }
   }
+
+
+//////////End of the Odometry Block///////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
 
 //Tempature readout
   void TempatureReadout() {
