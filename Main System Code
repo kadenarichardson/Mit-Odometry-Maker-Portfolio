@@ -1,0 +1,1358 @@
+#pragma region VEXcode Generated Robot Configuration
+// Make sure all required headers are included.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <math.h>
+#include <string.h>
+
+
+#include "vex.h"
+
+using namespace vex;
+
+// Brain should be defined by default
+brain Brain;
+
+
+// START V5 MACROS
+#define waitUntil(condition)                                                   \
+  do {                                                                         \
+    wait(5, msec);                                                             \
+  } while (!(condition))
+
+#define repeat(iterations)                                                     \
+  for (int iterator = 0; iterator < iterations; iterator++)
+// END V5 MACROS
+
+
+// Robot configuration code.
+motor LeftFront = motor(PORT13, ratio6_1, true);
+
+motor LeftMiddle = motor(PORT14, ratio6_1, false);
+
+motor LeftBack = motor(PORT15, ratio6_1, true);
+
+motor RightFront = motor(PORT16, ratio6_1, false);
+
+motor RightMiddle = motor(PORT17, ratio6_1, false);
+
+motor RightBack = motor(PORT18, ratio6_1, true);
+
+controller Controller1 = controller(primary);
+optical ColorSensor = optical(PORT7);
+digital_out MatchLoader = digital_out(Brain.ThreeWirePort.G);
+digital_out BottomGoal = digital_out(Brain.ThreeWirePort.B);
+rotation VerticalOdomWheel = rotation(PORT11, true);
+
+rotation HorizontalOdomWheel = rotation(PORT12, false);
+
+inertial InertialSensor = inertial(PORT4);
+
+led LEDA = led(Brain.ThreeWirePort.A);
+digital_out DoubleParkButton = digital_out(Brain.ThreeWirePort.E);
+digital_out DescorerAndHood = digital_out(Brain.ThreeWirePort.H);
+motor LowerIntakeMotorA = motor(PORT19, ratio18_1, true);
+motor LowerIntakeMotorB = motor(PORT20, ratio18_1, false);
+motor_group LowerIntake = motor_group(LowerIntakeMotorA, LowerIntakeMotorB);
+
+motor UpperIntake = motor(PORT10, ratio18_1, true);
+
+distance FrontDistanceSensor = distance(PORT2);
+
+
+// generating and setting random seed
+void initializeRandomSeed(){
+  int systemTime = Brain.Timer.systemHighResolution();
+  double batteryCurrent = Brain.Battery.current();
+  double batteryVoltage = Brain.Battery.voltage(voltageUnits::mV);
+
+  // Combine these values into a single integer
+  int seed = int(batteryVoltage + batteryCurrent * 100) + systemTime;
+
+  // Set the seed
+  srand(seed);
+}
+
+// Converts a color to a string
+const char* convertColorToString(color col) {
+  if (col == color::red) return "red";
+  else if (col == color::green) return "green";
+  else if (col == color::blue) return "blue";
+  else if (col == color::white) return "white";
+  else if (col == color::yellow) return "yellow";
+  else if (col == color::orange) return "orange";
+  else if (col == color::purple) return "purple";
+  else if (col == color::cyan) return "cyan";
+  else if (col == color::black) return "black";
+  else if (col == color::transparent) return "transparent";
+  else return "unknown";
+}
+
+
+void vexcodeInit() {
+
+  //Initializing random seed.
+  initializeRandomSeed(); 
+}
+
+
+// Helper to make playing sounds from the V5 in VEXcode easier and
+// keeps the code cleaner by making it clear what is happening.
+void playVexcodeSound(const char *soundName) {
+  printf("VEXPlaySound:%s\n", soundName);
+  wait(5, msec);
+}
+
+
+
+// define variable for remote controller enable/disable
+bool RemoteControlCodeEnabled = true;
+
+#pragma endregion VEXcode Generated Robot Configuration
+
+/*----------------------------------------------------------------------------*/
+/*                                                                            */
+/*    Module:       main.cpp                                                  */
+/*    Author:       {Kaden Richardson}                                                  */
+/*    Created:      {July 1, 2025}                                                    */
+/*    Description:  V5 project                                                */
+/*                                                                            */
+/*----------------------------------------------------------------------------*/
+
+// Include the V5 Library
+#include "vex.h"
+#include <cmath> 
+#include <string>
+  
+// Allows for easier use of the VEX Library
+using namespace vex;
+
+
+competition Competition;
+//Global Variables
+  double Theta = 0;
+  double X = 0;
+  double Y = 0;
+  double WheelCircum = 3.25 * 3.14159265358979323846;
+  double OdomWheelCircum = 2 * M_PI; // Inches
+  double Width = 0;
+  double Wheelbase = 0;
+  //dist of the horizontal wheel from the tracking point (center)
+  double HorizDistToTrackPt = 2; // Inches
+  //dist of the Vertical wheel from the tracking pt (center)
+  double VertDistToTrackPt = 1.625; // Inches
+  //1 for red alliance, and 2 for blue alliance, 3 is no alliance, set before auton mode
+  int AllianceColor = 2;
+   
+
+//Driver Controls (including all of the button controls)
+  //JoyStick controls
+    void RightSideControl(){
+      //spins right side motors forward
+      RightFront.spin(forward);
+      //sets velocity based on the axis change of the controller by percentage.
+      //if the controller axis isn't touched, it stops the motors.
+      RightFront.setVelocity(((Controller1.Axis2.position())),percent);
+      //same as before
+      RightMiddle.spin(forward);
+      RightMiddle.setVelocity(((Controller1.Axis2.position())),percent);
+      //same as before
+      RightBack.spin(forward);
+      RightBack.setVelocity((Controller1.Axis2.position()),percent);
+    }
+    //Left Side Control Zone
+    void LeftSideControl(){
+      //spins right side motors forward
+      LeftFront.spin(forward);
+      //sets velocity based on the axis change of the controller by percentage.
+      //if the controller axis isn't touched, it stops the motors.
+      LeftFront.setVelocity(((Controller1.Axis3.position())),percent);
+      //same as before
+      LeftMiddle.spin(forward);
+      LeftMiddle.setVelocity(((Controller1.Axis3.position())),percent);
+      //same as before
+      LeftBack.spin(forward);
+      LeftBack.setVelocity(((Controller1.Axis3.position())),percent);
+    }
+
+
+  //Intake Codes
+    //Intake Stops
+    void LowerIntakeStop(){
+      LowerIntake.stop();
+    }
+    void UpperIntakeStop(){
+      UpperIntake.stop();
+    }
+    bool BottomScoring = false;
+    bool TopScoring = false;
+    void StopIntakeMotors(){
+      TopScoring = false;
+      BottomScoring = false;
+      LowerIntakeStop();
+      UpperIntakeStop();
+    }
+    //intake spinning forward to release balls
+    void R1ButtonPressed() {
+      LowerIntake.setVelocity(100,percent);
+      UpperIntake.setVelocity(100,percent);
+      LowerIntake.spin(reverse);
+      UpperIntake.spin(forward);
+    }
+    //pickup
+    void L1ButtonPressed() {
+      TopScoring = true;
+      LowerIntake.spin(forward);
+      UpperIntake.spin(reverse);
+      LowerIntake.setVelocity(100,percent);
+      UpperIntake.setVelocity(-100,percent);
+    }
+    void L2ButtonPressed() {
+      BottomScoring = true;
+      LowerIntake.setVelocity(100,percent);
+      UpperIntake.setVelocity(100,percent);
+      LowerIntake.spin(forward);
+      UpperIntake.spin(forward);
+    }
+  //MatchLoadercode
+    bool MatchLoaderDown = false;
+    void MatchLoaderButton(){
+      //The Matchloader is not down
+      if (MatchLoaderDown == false) {
+        //sets the match loader down
+          MatchLoader.set(true);
+          MatchLoaderDown = true;
+      }
+      //Pulls Matchloader up
+      else if (MatchLoaderDown == true) {
+          MatchLoader.set(false);
+          MatchLoaderDown = false;
+      }
+    } 
+
+  //Double Park Code
+    bool DoubleParkEnabled = false;
+    void DoublePark(){
+      //The Double Park is not enabled
+      if (DoubleParkEnabled == false) {
+        //Enables the double park
+          DoubleParkButton.set(true);
+          DoubleParkEnabled = true;
+      }
+      //The Double park is enabled
+      else if (DoubleParkEnabled == true) {
+        //disables the double park
+          DoubleParkButton.set(false);
+          DoubleParkEnabled = false;
+      }
+    } 
+  //Descorer code
+    bool DescorerAndHoodUp = false;
+    void DescorerAndHoodControl(){
+      //The is the descorer is not up
+      if (DescorerAndHoodUp == false) {
+        //sets the descorer up
+          DescorerAndHood.set(true);
+          DescorerAndHoodUp = true;
+      }
+      //The Descorer is up
+      else if (DescorerAndHoodUp== true) {
+        //sets the Descorer down
+          DescorerAndHood.set(false);
+          DescorerAndHoodUp = false;
+      }
+    } 
+
+  
+//Odometry
+  void Odometry() {
+  //estabishes the variables that are only used in this function
+    double DeltaXLocal = 0;
+    double DeltaYLocal = 0;
+  //Calibrates
+  wait(0.3,seconds);
+  HorizontalOdomWheel.setPosition(0,degrees);
+  VerticalOdomWheel.setPosition(0,degrees);
+  InertialSensor.calibrate();
+  wait(0.3,seconds);
+  //initialize variables 
+  double PreviousH = HorizontalOdomWheel.position(degrees) * OdomWheelCircum/360;
+  double PreviousV = VerticalOdomWheel.position(degrees)* OdomWheelCircum/360;
+  //Previous Angle (theta) in Radians
+  double PreviousT = 0;
+  //while loop for Odom
+  while (true) {
+  //Calculates the distance in inches that the motor is in
+   double CurrentH =  HorizontalOdomWheel.position(degrees) * OdomWheelCircum/360;
+   double CurrentV =  VerticalOdomWheel.position(degrees)* OdomWheelCircum/360;
+   //In Radians
+   double CurrentT = InertialSensor.heading(degrees)* (3.1415912/180);
+  //calculates the change in distance for the motor encoders
+   double DeltaH = CurrentH - PreviousH;
+   double DeltaV = CurrentV - PreviousV;
+   double DeltaTheta = CurrentT - PreviousT;
+  //keeps angle between 2pi radians and -2pi radians
+  if (DeltaTheta > M_PI) DeltaTheta -= 2 * M_PI;
+  if (DeltaTheta < -M_PI) DeltaTheta += 2 * M_PI;
+
+  //makes it so if there is tiny movements from sensor drift it does constantly add numbers
+  //if (fabs(DeltaH < 0.05) and fabs(DeltaV < 0.05)) {
+      //DeltaTheta = 0;
+  //}
+
+  if (fabs(DeltaTheta < 0.001)) {
+      DeltaTheta = 0;
+  }
+  //Determines change in heading is 0
+  //if it is zero It just adds the local Odom X same for Y but with V
+  if (DeltaTheta == 0) {
+    DeltaXLocal = DeltaH;
+    DeltaYLocal = DeltaV;
+  }
+  //Chord formula 
+  else {
+    DeltaXLocal = 2*sin(DeltaTheta/2)*((DeltaH/DeltaTheta) + HorizDistToTrackPt);
+    DeltaYLocal = 2*sin(DeltaTheta/2)*((DeltaV/DeltaTheta) + VertDistToTrackPt);
+  } 
+  //average orientation of Robot
+  double AvgOrient = PreviousT + (DeltaTheta/2);
+  
+  //To convert the cartesian coordinates to polar that we calculated 
+  //We need the Radius and the angle of the coordinates
+  double RadiusOfCortesian = sqrt((DeltaXLocal*DeltaXLocal)+(DeltaYLocal*DeltaYLocal));
+  double CortesianTheta = atan2(DeltaYLocal,DeltaXLocal);
+
+  //Rotate the cords by the Average Orientation 
+  double GlobalTheta = CortesianTheta + AvgOrient;
+
+  //Cords to the cords by cortesian coordinates
+  double GlobalX = RadiusOfCortesian * cos(GlobalTheta);
+  double GlobalY = RadiusOfCortesian * sin(GlobalTheta);
+
+  //Adds the X cordinate that we converted into the x value
+  X -= GlobalX;
+  Y += GlobalY;
+  //prints the X and Y and the Heading
+  Brain.Screen.setCursor(1,2);
+  Brain.Screen.print("X: %.2f", X);
+  Brain.Screen.setCursor(3,2);
+  Brain.Screen.print("Y: %.2f",Y);
+  Brain.Screen.setCursor(2,2);
+  Brain.Screen.print("Heading: %.2f",InertialSensor.heading(degrees));
+
+  //establishes previous values for the change.
+   PreviousH = CurrentH;
+   PreviousV = CurrentV;
+   PreviousT = CurrentT;
+
+  wait(5,msec); 
+  }
+  }
+
+//Tempature readout
+  void TempatureReadout() {
+  while (true) { 
+  //RightFront Tempature
+    Brain.Screen.setFont(mono12);
+    Controller1.Screen.setCursor(1,1);
+    Controller1.Screen.print("RF: %.2f", RightFront.temperature(percent));
+    //Right Middle
+    Controller1.Screen.setCursor(2,1);
+    Controller1.Screen.print("RM: %.2f",RightMiddle.temperature(percent));
+    //Right Back
+    Controller1.Screen.setCursor(3,1);
+    
+    Controller1.Screen.print("RB: %.2f", RightBack.temperature(percent));
+  //LeftFront Tempature
+    Controller1.Screen.setCursor(1,12);
+    Controller1.Screen.print("LF: %.2f", LeftFront.temperature(percent));
+    //Left Middle
+    Controller1.Screen.setCursor(2,12);
+    Controller1.Screen.print("LM: %.2f", LeftMiddle.temperature(percent));
+    //Intake tempature readout
+    Controller1.Screen.setCursor(3,12);
+    Controller1.Screen.print("I: %.2f", UpperIntake.temperature(percent));
+  }
+
+
+  }
+//Color Sorting
+  void Eject(){
+      if (TopScoring == true) {
+        UpperIntake.setVelocity(100,percent);
+        UpperIntake.spin(forward);  
+      }
+      else if (BottomScoring == true) {
+        UpperIntake.setVelocity(100,percent);
+        UpperIntake.spin(reverse);
+       
+  
+      }
+
+    }
+  void CorrectColor(){
+       if (TopScoring == true) {
+        UpperIntake.setVelocity(100,percent);
+        UpperIntake.spin(reverse);
+      }
+      else if (BottomScoring == true) {
+        UpperIntake.setVelocity(100,percent);
+        UpperIntake.spin(forward);
+
+      }
+  }
+  //Color Detected:  0 =  none, 1 = red, 2 = blue 
+  int DetectColor(){
+    ColorSensor.setLight(ledState::on);
+    ColorSensor.integrationTime(10);
+    //detect a hue
+   int HueDetected = ColorSensor.hue();
+    //Red detected
+    if (HueDetected <40) {
+      Brain.Screen.clearScreen();
+      Brain.Screen.print("Red");
+      Brain.Screen.setFillColor(red);
+      Brain.Screen.drawRectangle(0, 0, 479, 239);
+      return 1;
+    }
+    //Blue Detected
+    else if (HueDetected >150) {
+      Brain.Screen.clearScreen();
+      Brain.Screen.print("Blue");
+      Brain.Screen.setFillColor(blue);
+      Brain.Screen.drawRectangle(0, 0, 479, 239);
+      return 2;
+    }
+    //nothing detected
+    else {
+      Brain.Screen.clearScreen();
+      Brain.Screen.setFillColor(black);
+      Brain.Screen.drawRectangle(0, 0, 479, 239);
+
+      return 0;
+    }
+  }
+  //Function that combines the Eject and Detect Color function. Depending on the alliance colors it rejects the opposite alliances color.
+    void ColorSorting(){
+      int colorDetected = DetectColor();
+      //no color detected
+      if  (colorDetected == 0) {
+        CorrectColor();
+
+      }
+      //no color sorting for skills
+      if (AllianceColor == 3){
+        CorrectColor();
+      }
+      //Eject based on alliance color and color detected are not the same value
+      if (AllianceColor != colorDetected) {
+        //LEDG.on();
+        Eject();
+        }
+      else {CorrectColor();};
+      wait(10,msec);
+    }
+
+
+//Autonomous Selector
+  //variable to determine what is picked 1 = Left, 2 = Right, 3 = Left Elims, 4 = Right Elims, 5= Skills
+    double Mode = 0;
+  void AutonomousSelector() {
+      //when initally Started it shows the cover screen
+      //A way to determine what screen you are on
+      double ScreenOn = 0;
+      //what mode of autonomous you are on
+      //A way to
+      Brain.Screen.drawImageFromFile("Cover.png",0,0); 
+      wait(3,seconds);
+      Brain.Screen.drawImageFromFile("SideSelector.png",0,0);
+      ScreenOn = 1;
+      //a loop that
+      bool wasPressing = false;
+
+   while (ScreenOn != 0) {
+       bool isPressing = Brain.Screen.pressing();
+     if (isPressing && !wasPressing) {
+       
+
+          wait(10,msec);
+          int XPos = Brain.Screen.xPosition();
+          int YPos = Brain.Screen.yPosition();
+            //What Screen Slected Screen
+              if (ScreenOn == 2){
+                //Back Button
+                if ((XPos >= (267.3) && XPos <= (267.3+197.2)) && (YPos >= 127.3 && YPos <= (127.3+88.7))) {
+                  Brain.Screen.drawImageFromFile("SideSelector.png",0,0);
+                  wait(0.1,seconds);
+                  ScreenOn = 1;
+                }
+                //confirm button
+                if ((XPos >= (267.3) && XPos <= (267.3+197.2)) && (YPos >= 24 && YPos <= (24+82.7)))  {
+                  Brain.Screen.drawImageFromFile("Cover.png",0,0); 
+                  ScreenOn = 0;
+                }
+              } 
+            //Screen 1 to select screens
+             else if (ScreenOn == 1) {
+              //Left 
+                if ((XPos >= 9.2 && XPos <= 141.5) && (YPos >= 16.6 && YPos <= 223.4)) {
+                  //Indicates that the mode is left
+                  Mode = 1;
+                  //draws thred or blue screen
+                  Brain.Screen.drawImageFromFile("RedorBlue.png",0,0);
+                  //indicates that the screen is on the red or blue section
+                  ScreenOn = 4;
+                  wait(0.1,seconds);
+                }
+              //Right 
+                  else if ((XPos >= 152.5 && XPos <= 284.8) &&(YPos >= 16.6 && YPos <= 223.4)) {
+                  //Indicates that the mode is right
+                  Mode = 2;
+                  //draws the red or blue screen
+                  Brain.Screen.drawImageFromFile("RedorBlue.png",0,0);
+                  //indicates that the screen is on the red or blue section
+                  ScreenOn = 4;
+                  wait(0.1,seconds);
+                  }
+              //Elims button
+                 else if ((XPos >= 166.2 && XPos <= (166.2+295.8)) && (YPos >= (126.7) && YPos <= (126.7+97))) {
+                  Brain.Screen.drawImageFromFile("Elims.png",0,0);
+                  //goes to elims png
+                  ScreenOn = 3;
+                  wait(0.1,seconds);
+               }
+
+              //Skills Button    
+                if ((XPos >= 166.2 && XPos <= (166.2+295.8)) && (YPos >= (16.9) && YPos <= (16.9+95.7))) {
+                  Mode = 5;
+                  Brain.Screen.drawImageFromFile("WhatSideSelected.png",0,0);
+                  Brain.Screen.setCursor(3,3);
+                  Brain.Screen.print("Skills");
+                  ScreenOn = 2;
+                  AllianceColor = 3;
+                  wait(0.1,seconds);
+              }
+              }
+            //Elims Screen
+              else if (ScreenOn == 3) {
+                  //Left Elims
+                if ((XPos >= 248.6 && XPos <= 458.6) && (YPos >= 85 && YPos <= 146.8)) {
+                    //Indicates that the mode is left elims
+                    Mode = 3;
+                    //draws the red or blue screen
+                    wait(0.1,seconds);
+                    Brain.Screen.drawImageFromFile("RedorBlue.png",0,0);
+                    //indicates that the screen is on the red or blue section
+                    ScreenOn = 4;
+        
+                  }
+                //Right Elims
+                if ((XPos >= 14.4 && XPos <= 224.2) && (YPos >= 85 && YPos <= 146.8)) {
+                    //Indicates that the mode is left
+                    Mode = 4;
+                    //draws the red or blue screen
+                    Brain.Screen.drawImageFromFile("RedorBlue.png",0,0);
+                    //indicates that the screen is on the red or blue section
+                    ScreenOn = 4;
+                    wait(0.1,seconds);
+                  }
+               } 
+            //Red or blue Screen
+               else if (ScreenOn == 4){
+                //Red Button
+                if ((XPos >= 248.6 && XPos <= (248.6+229)) && (YPos >= 24.6 && YPos <= (24.6+189.2))) {
+                   wait(0.1,seconds);
+                  Brain.Screen.drawImageFromFile("WhatSideSelected.png",0,0);
+                  Brain.Screen.setFillColor(white);
+                   Brain.Screen.setPenColor(black);
+                  Brain.Screen.setFont(prop40);
+                  Brain.Screen.setFillColor(white);
+                  Brain.Screen.setCursor(3,3);
+                  if (Mode == 1) {
+                    Brain.Screen.print("Red Left");
+                  }
+                   if (Mode == 2) {
+                    Brain.Screen.print("Red Right");
+                  }
+                   if (Mode == 3) {
+                    Brain.Screen.print("Red Left Elims");
+                  }
+                   if (Mode == 4) {
+                    Brain.Screen.print("Red Right Elims");
+                  }
+                  //sets the alliance color to red
+                  AllianceColor = 1;
+  
+                  ScreenOn = 2;
+                }
+                //Blue Button
+                else if ((XPos >= 14.4 && XPos <= (14.4+218.6)) && (YPos >= 24 && YPos <= (24+189.2)))  {
+                  Brain.Screen.drawImageFromFile("WhatSideSelected.png",0,0);
+                  AllianceColor = 2;
+                  Brain.Screen.setPenColor(black);
+                  Brain.Screen.setFont(prop40);
+                  Brain.Screen.setFillColor(white); 
+                  Brain.Screen.setCursor(3,3);
+                  if (Mode == 1) {
+                    Brain.Screen.print("Blue Left");
+                  }
+                   if (Mode == 2) {
+                    Brain.Screen.print("Blue Right");
+                  }
+                   if (Mode == 3) {
+                    Brain.Screen.print("Blue Left Elims");
+                  }
+                   if (Mode == 4) {
+                    Brain.Screen.print("Blue Right Elims");
+                  }
+                   //sets the alliance color to blue
+                  AllianceColor = 2;
+                  wait(0.1,seconds);
+                  ScreenOn = 2;
+                }
+              } 
+          }
+        wasPressing = isPressing;
+        wait(10,msec);
+
+              
+      }
+  }
+
+void VEXcode_driver_task() {
+  // Start the driver control tasks....
+  while(Competition.isDriverControl() && Competition.isEnabled()) {this_thread::sleep_for(10);};
+  return;
+}
+//Autonomous Functions
+  //code that spins all of the right side motors
+    void RightMotorGroup (double velocity) {
+    RightFront.spin(forward);
+    RightFront.setVelocity(velocity,percent);
+    RightMiddle.spin(forward);
+    RightMiddle.setVelocity(velocity,percent);
+    RightBack.spin(forward);
+    RightBack.setVelocity(velocity,percent);
+    }
+  //code that spins all of theleft side motors
+    void LeftMotorGroup (double velocity) {
+    LeftFront.spin(forward);
+    LeftMiddle.setVelocity(velocity,percent);
+    LeftBack.spin(forward);
+    LeftFront.setVelocity(velocity,percent);
+    LeftMiddle.spin(forward);
+    LeftBack.setVelocity(velocity,percent);
+    }
+
+  //Move Balls
+    //Score Blocks on top goal
+    void ScoreBlocks(){
+      DescorerAndHood.set(false);
+      wait(2.5,seconds);
+      DescorerAndHood.set(true);
+    }
+  //drive to pt command
+    double MotorVelocityRotate = 0;
+    double MotorVelocityDrive = 0;
+   void DriveToPt (double DesiredX, double DesiredY, double Velocity, double MinSpeed, double Timeout,bool IntakeSpinning) {
+      //sets the motors to go quicker
+      RightMotorGroup(Velocity);
+      LeftMotorGroup(Velocity);
+
+      //Distances that are Determined based on X and Y axis
+      double DesiredDist = sqrt(pow(DesiredX - X, 2) + pow(DesiredY - Y, 2));
+      double DesiredTheta = -(atan2(DesiredY - Y,DesiredX - X) * (180.0 / M_PI)-90);
+      //backwards code 
+        //determines if the backwards is one it goes backwards
+        double backwards = 0;
+        //if the desired theta is more than 90 it flip the angle -180 degrees so that it would be in the perfect position to go backwards.
+        if (DesiredTheta > 90) {
+          DesiredTheta -= 180;
+          backwards = 1;
+        }
+        //Determines whether the angle is less that -90. it flips the angle +180 degrees so that it would be in the perfect position to go backwards.
+        if (DesiredTheta < -90) {
+          DesiredTheta += 180;
+          backwards = 1;
+
+        } 
+         if (DesiredTheta > 180) DesiredTheta -= 360;
+        if (DesiredTheta < -180) DesiredTheta += 360;
+    
+      double RotateKp = 0.4; 
+      double RotateKi = 0.0; 
+      double RotateKd = 0.6; 
+      
+      double DriveKp = 1.4;
+       double DriveKi = 0.0; 
+       double DriveKd = 0.8;
+
+    //variables that change during the loop
+      double RemainingDist = DesiredDist;
+      double RemainingAngle = 0;
+      double PrevRemainingAngle = 0;
+      double PrevRemainingDist = 0;
+
+      double DriveIntegral = 0;
+      double RotateIntegral = 0;
+      double RotateDerivative = 0;
+      double DriveDerivative = 0;
+      double CurrentAngle = 0;
+      //Velocity headers
+      MotorVelocityRotate = 0;
+      MotorVelocityDrive = 0;
+      Brain.Timer.clear();  // clears the current time stored in the timer
+      //variable that established how long the drive to pt loop has been going
+      double ElapsedTime = 0;
+      //establishes the time when the timer has started
+      double StartTime = Brain.Timer.time(vex::timeUnits::msec);  
+      //exits the loop when the remaing distance is less than 1.5
+      while (std::abs(RemainingDist) > 2) {
+        ElapsedTime = Brain.Timer.time(vex::timeUnits::msec)- StartTime; 
+        if (ElapsedTime > Timeout) {
+          break;
+        }
+
+        //current angle for program and dist
+      //Recalculates Desired angle
+        DesiredTheta = -(atan2(DesiredY - Y,DesiredX - X) * (180.0 / M_PI)-90);
+        backwards = 0;
+
+if (fabs(DesiredTheta) > 90) {
+    if (DesiredTheta > 0)
+        DesiredTheta -= 180;
+    else
+        DesiredTheta += 180;
+
+    backwards = 1;
+}
+
+         if (DesiredTheta > 180) DesiredTheta -= 360;
+        if (DesiredTheta < -180) DesiredTheta += 360;
+      //backwards code 
+        //determines if the backwards is one it goes backwards
+        
+        
+        CurrentAngle = InertialSensor.heading(degrees); // 0 to 360
+        if (CurrentAngle > 180){
+        CurrentAngle -= 360;
+        }
+        //dist formula for remaining dist
+        RemainingDist =  sqrt(((DesiredX - X) *(DesiredX - X)) + ((DesiredY - Y) *(DesiredY - Y)));
+        //remaining angle calculation
+        RemainingAngle = (DesiredTheta - CurrentAngle);
+        //makes it so the remaining angle stays between 180 and -180
+      if (RemainingAngle > 180) RemainingAngle -= 360;
+      if (RemainingAngle < -180) RemainingAngle += 360;
+
+        if (RemainingAngle > 90){
+          RemainingAngle -= 180;
+          backwards = 1;
+        }
+        //Determines whether the angle is less that -90. it flips the angle +180 degrees so that it would be in the perfect position to go backwards.
+        if (RemainingAngle < -90) {
+          RemainingAngle += 180;
+          backwards = 1;
+
+        } 
+
+      
+        //Integral for Drive and Rotate
+        DriveIntegral = (DriveIntegral+ RemainingDist);
+        RotateIntegral = (RotateIntegral+ RemainingAngle);
+        
+        //Derivative for Drive and Rotate
+        RotateDerivative = RemainingAngle - PrevRemainingAngle;
+        DriveDerivative = RemainingDist - PrevRemainingDist;
+        
+        //Formula for Motor Velocities
+        MotorVelocityDrive = (RemainingDist*DriveKp)+(DriveIntegral*DriveKi)+(DriveDerivative*DriveKd);
+    
+        //reverse the direction if it is called for
+          if (backwards == 1) {
+            MotorVelocityDrive = MotorVelocityDrive * -1;
+          }
+
+        MotorVelocityRotate = (RemainingAngle*RotateKp)+(RotateIntegral*RotateKi)+(RotateDerivative*RotateKd);
+        
+        
+  
+        //Makes a minimun speed
+            if (fabs(MotorVelocityDrive) < MinSpeed)
+                  MotorVelocityDrive = copysign(MinSpeed, MotorVelocityDrive);
+        //Slows down Pid At a certain distance
+            if (RemainingDist < 6)
+              MotorVelocityDrive *= RemainingDist / 6.0;
+
+          //clamps the motor velocity to max velocity
+          if (MotorVelocityDrive > Velocity) MotorVelocityDrive = Velocity;
+          if (MotorVelocityDrive < -Velocity) MotorVelocityDrive = -Velocity;
+          if (MotorVelocityRotate > Velocity) MotorVelocityRotate =Velocity;
+          if (MotorVelocityRotate < -Velocity) MotorVelocityRotate = -Velocity;
+        
+        //Motor groups moving
+        LeftMotorGroup((MotorVelocityDrive + MotorVelocityRotate));
+        RightMotorGroup((MotorVelocityDrive - MotorVelocityRotate));
+         
+        
+
+        //determines the remaining angle for the next loop
+        PrevRemainingDist = RemainingDist;
+        //determines the remaining angle for the next loop
+        PrevRemainingAngle = RemainingAngle;
+        wait(5,msec);
+    
+    }
+      Controller1.Screen.print("Loop Exited");
+      RightMotorGroup(0);
+      LeftMotorGroup(0);
+
+    }  
+     //Move robot a certain distance. No odom or pid 
+    void DistanceDrive(double Distance, double velocity, bool IntakeSpinning) {
+       //Left Side velocity Motor Controls
+      LeftFront.setVelocity(velocity,percent);
+      LeftMiddle.setVelocity(velocity,percent);
+      LeftBack.setVelocity(velocity,percent);
+      //Right Motor velocity control
+      RightFront.setVelocity(velocity,percent);
+      RightMiddle.setVelocity(velocity,percent);
+      RightBack.setVelocity(velocity,percent);
+      //Left side Motor Control
+      LeftFront.spinFor(forward,(Distance)/(WheelCircum),turns, false);
+      LeftMiddle.spinFor(forward,(Distance)/(WheelCircum),turns, false);
+      LeftBack.spinFor(forward,(Distance)/(WheelCircum),turns, false);
+      //Right Side Motor control
+      RightFront.spinFor(forward,(Distance)/(WheelCircum),turns, false);
+      RightMiddle.spinFor(forward,(Distance)/(WheelCircum),turns, false);
+      RightBack.spinFor(forward,(Distance)/(WheelCircum),turns, false);
+
+    }
+    //Pick up function for matchloader
+     void MatchLoaderPickUp(){
+      DistanceDrive(39.5,50,false);
+      wait(4,seconds);
+      DistanceDrive(-3,100,false);
+      wait(0.3,seconds);
+      DistanceDrive(3,100,false);
+    }
+//Pid Rotational Program
+  //Max speed of the robot
+    double MaxSpeed = 100;
+  //Rotate left or right function
+    void RotateFunction(double V) {
+    //Rotate right and checks if the velocity of the loop is more than the max speed so it sets it to the max speed
+    if (V > MaxSpeed) {
+      RightMotorGroup(MaxSpeed*-1);
+      LeftMotorGroup(MaxSpeed*1);
+    }
+    //does the same thing as above but for negative and left
+    else if (V < MaxSpeed * -1) {
+      RightMotorGroup(MaxSpeed*1);
+      LeftMotorGroup(MaxSpeed*-1);
+    }
+    else {
+      RightMotorGroup(V* -1);
+      LeftMotorGroup(V* 1);
+    }
+    }
+  //Rotate To heading
+    void RotateToHeading(double DesiredHeading, double velocity, double Timeout){
+        //Constants for Pid Loop
+        double Kp = .35;
+        double Ki = 0.00;
+        double Kd = 0.28;
+      //initalizes variables
+        RightMotorGroup(velocity);
+        LeftMotorGroup(velocity);
+        //variables that change during the loop
+        double Integral = 0;
+        double PrevRemainingAngle = 0;
+        double Derivative = 0;
+        double CurrentAngle = 0;
+        MaxSpeed = velocity;
+        double RemainingAngle = DesiredHeading-InertialSensor.heading(degrees);
+        MotorVelocityRotate = 0;
+        //exits the loop when the remaing angle
+        double StartTime = Brain.Timer.time(vex::timeUnits::msec); 
+        while (fabs(RemainingAngle) >  1) {
+          double ElapsedTime = Brain.Timer.time(vex::timeUnits::msec)-StartTime; 
+          if (ElapsedTime > Timeout) {
+            break;
+          }
+          Controller1.Screen.clearScreen();
+          CurrentAngle = InertialSensor.heading(degrees);
+          RemainingAngle = DesiredHeading - CurrentAngle;
+          //clamps the code so that it goes the closest distance
+          if (RemainingAngle > 180) RemainingAngle -= 360;
+          if (RemainingAngle < -180) RemainingAngle += 360;
+          //Variable redefinition
+          Integral = (Integral+ RemainingAngle);
+          Derivative = RemainingAngle - PrevRemainingAngle;
+          MotorVelocityRotate = (RemainingAngle*Kp)+(Integral*Ki)+(Derivative*Kd);
+          RotateFunction(MotorVelocityRotate);
+          //determines the remaining angle for the next loop
+          PrevRemainingAngle = RemainingAngle;
+          //debugging incase the loop does not exit
+          Controller1.Screen.print("loop cleared");
+          wait(10,msec);
+        }
+        Controller1.Screen.print("loop exited");
+        //stops all motors when the loop is exited
+        RightMotorGroup(0);
+        LeftMotorGroup(0);
+
+    }  
+//Autonomous codes
+  //Autonomous of left
+    void Left(){
+      X = 47;
+      Y=  22;
+      wait(0.1,seconds);
+      DescorerAndHood.set(true);
+      LowerIntake.setVelocity(100,percent);
+      LowerIntake.spin(forward);
+       UpperIntake.setVelocity(100,percent);
+      UpperIntake.spin(reverse);
+      DriveToPt(40,48,100,10,2700,false);
+      RotateToHeading(235,100,1500);
+      DistanceDrive(-18,30,1000);
+       wait(0.8,seconds);
+      RotateToHeading(230,100,1000);
+
+      UpperIntake.spin(forward);
+      wait(1.0,seconds);
+      UpperIntake.spin(reverse);
+      UpperIntake.setVelocity(100,percent);
+      wait(0.7,seconds);
+      UpperIntake.spin(forward);
+      DistanceDrive(52,100,false);
+      wait(1.2,seconds);
+      UpperIntake.spin(reverse);
+      MatchLoader.set(true);
+      RotateToHeading(185,100,1000);
+      DescorerAndHood.set(true);
+      DistanceDrive(46,50,false);
+      wait(1.8,seconds);
+      DriveToPt(13,45,100,15,1700,false);
+      DescorerAndHood.set(false);
+      DistanceDrive(-50,100,false);
+
+      
+  
+    }  
+    void LeftElims(){
+      X = 49.5;
+      Y=  22;
+      DescorerAndHood.set(true);
+      LowerIntake.setVelocity(100,percent);
+      LowerIntake.spin(forward);
+      UpperIntake.setVelocity(100,percent);
+      UpperIntake.spin(reverse);
+      DriveToPt(44,46,100,10,2700,false);
+      MatchLoader.set(true);
+      RotateToHeading(45,100,1500);
+      DriveToPt(17,25,100,10,3500,false);
+      RotateToHeading(185,100,2500);
+      MatchLoader.set(true);
+      wait(0.2,seconds);
+      DistanceDrive(25,42,1000);
+      wait(2.0,seconds);
+      RotateToHeading(180,100,1000);
+      DriveToPt(17,45,100,10,1000,false);
+      wait(1.0,seconds);
+      RotateToHeading(180,100,1000);
+      DescorerAndHood.set(false);
+      wait(0.4,seconds);
+      LowerIntake.spin(reverse);
+      wait(0.4,seconds);
+      LowerIntake.spin(forward);
+  
+    }
+
+
+  //Autonomous of  Right
+      void Right() {
+        DescorerAndHood.set(true);
+      X = 86;
+      Y = 22;
+      wait(.1,seconds);
+      LowerIntake.setVelocity(100,percent);
+      LowerIntake.spin(forward);
+      UpperIntake.setVelocity(60,percent);
+      UpperIntake.spin(reverse);
+      DriveToPt(90,44,100,5,1500,false);
+      MatchLoader.set(true);
+      RotateToHeading(315,100,1000);
+      MatchLoader.set(false);
+      DistanceDrive(18,30,false);
+      LowerIntake.spin(reverse);
+      wait(2.3,seconds);
+      LowerIntake.spin(forward);
+      TopScoring = true;
+      DriveToPt(120,23,100,10,3500,false);
+      MatchLoader.set(true);
+      RotateToHeading(180,100,1500);
+      DistanceDrive(23,25,1000);
+      wait(1.4,seconds);
+
+
+
+      
+      RotateToHeading(180,100,1000);
+      DriveToPt(119,47,100,10,1500,false);
+      DescorerAndHood.set(false);
+       DistanceDrive(-23,100,1000);
+      UpperIntake.setVelocity(60,percent);
+      UpperIntake.spin(reverse);
+      }
+  void RightWing() {
+     LowerIntake.spin(forward);
+      LowerIntake.setVelocity(100,percent);
+      UpperIntake.setVelocity(100,percent);
+      UpperIntake.spin(reverse);
+      DescorerAndHood.set(true);
+      InertialSensor.setHeading(90,degrees);
+      X = 88;
+      Y = 22;
+      DriveToPt(120,25,100,10,3000,false);
+      wait(0.5,seconds);
+      RotateToHeading(180,100,2500);
+      DistanceDrive(23,25,false);
+      wait(1.0,seconds);
+      DriveToPt(116,47,100,20,1300,false);
+      DescorerAndHood.set(false);
+      DistanceDrive(-50,30,false);
+      X = 120;
+      Y = 48;
+      wait(1.0,seconds);
+      DistanceDrive(10,50,false);
+      DriveToPt(110,40,100,10,1700,false);
+      RotateToHeading(180,100,false);
+      DistanceDrive(-30,50,false);
+  }
+    
+  //Eliminations Auton for right
+         void RightElims() {
+     DescorerAndHood.set(true);
+      X = 86;
+      Y = 22;
+      wait(.1,seconds);
+      LowerIntake.setVelocity(100,percent);
+      LowerIntake.spin(forward);
+      UpperIntake.setVelocity(60,percent);
+      UpperIntake.spin(reverse);
+      DriveToPt(93,45,100,5,1700,false);
+      MatchLoader.set(true);
+      RotateToHeading(315,100,1000);
+      MatchLoader.set(false);
+      LowerIntake.spin(forward);
+      DriveToPt(120,23,100,10,3500,false);
+      MatchLoader.set(true);
+      RotateToHeading(185,100,1500);
+      DistanceDrive(24,30,1000);
+      wait(1.5,seconds);
+      RotateToHeading(180,100,1000);
+      DriveToPt(117,47,100,10,1600,false);
+      DescorerAndHood.set(false);
+       DistanceDrive(-50,80,false);
+       wait(1.0,seconds);
+      UpperIntake.setVelocity(100,percent);
+      UpperIntake.spin(reverse);
+      wait(0.3,seconds);
+      LowerIntake.spin(reverse);
+      wait(0.3,seconds);
+      LowerIntake.spin(forward);
+      
+    
+    
+    
+      }
+
+  
+  //Skills Auto
+    void Skills2loaders(){
+      LowerIntake.spin(forward);
+      LowerIntake.setVelocity(100,percent);
+      UpperIntake.setVelocity(100,percent);
+      UpperIntake.spin(reverse);
+      DescorerAndHood.set(true);
+      InertialSensor.setHeading(90,degrees);
+      X = 88;
+      Y = 22;
+      DriveToPt(120,25,100,10,3000,false);
+      wait(0.5,seconds);
+      RotateToHeading(180,100,2500);
+      wait(0.3,seconds);
+      DistanceDrive(-75,50,false);
+      MatchLoader.set(true);
+      wait(1,seconds);
+      RotateToHeading(180,100,2500);
+      MatchLoaderPickUp();
+      DistanceDrive(-10,100,1000);
+      wait(.3,seconds);
+       MatchLoader.set(false);
+      RotateToHeading(65,100,1000);
+      DriveToPt(130,38.5,100,5,1900,false);
+      RotateToHeading(359,100,1500);
+      MatchLoader.set(false);
+      wait(0.5,seconds);
+      DriveToPt(129,120,100,5,2000,false);
+      DriveToPt(113,123,100,5,3000,false);
+      wait(0.1,seconds);
+      RotateToHeading(1,100,1000);
+      wait(0.5,seconds);
+      DistanceDrive(-60,40,false);
+      wait(0.4,seconds);
+      ScoreBlocks();
+      wait(1,seconds);
+      MatchLoader.set(true);
+      ScoreBlocks();
+      LowerIntake.spin(forward);
+      LowerIntake.setVelocity(100,percent);
+      RotateToHeading(180,100,3000);
+      MatchLoaderPickUp();
+      DistanceDrive(-40,30,false);
+      MatchLoader.set(false);
+      wait(1,seconds);
+      ScoreBlocks();
+      //Go To Park
+      DistanceDrive(10,100,false);
+      wait(1,seconds);
+      MatchLoader.set(false);
+      RotateToHeading(270,100,1000);
+      DistanceDrive(18,100,false);
+      wait(1,seconds);
+      RotateToHeading(180,100,2500);
+      DistanceDrive(650,70,false);
+      wait(3,seconds);
+      RotateToHeading(260,100,1000);
+      MatchLoader.set(true);
+      DoubleParkButton.set(true);
+      wait(1,seconds);
+      DistanceDrive(50,70,true);
+      wait(0.5,seconds);
+      MatchLoader.set(false);
+    }
+    void Skills1loader(){
+      DescorerAndHood.set(true);
+      ColorSensor.integrationTime(5);
+      ColorSensor.setLight(ledState::on);
+      X = 86;
+      Y = 22;
+      wait(.3,seconds);
+      //To 4 blocks 
+      LowerIntake.setVelocity(100,percent);
+      LowerIntake.spin(forward);
+      UpperIntake.setVelocity(100,percent);
+      UpperIntake.spin(reverse);
+      DriveToPt(93,46,100,5,2500,false);
+      MatchLoader.set(true);
+      wait(1.0,seconds);
+      RotateToHeading(315,100,1000);
+      MatchLoader.set(false);
+      DriveToPt(119,30,100,5,5500,false);
+       RotateToHeading(180,100,1500);
+      DriveToPt(120.5,45,100,30,1500,false);
+      RotateToHeading(180,100,2500);
+      MatchLoader.set(true);
+      //To long goal
+      DistanceDrive(-10,50,false);
+      wait(1.5,seconds);
+      wait(0.5,seconds);
+      DescorerAndHood.set(false);
+      wait(0.8,seconds);
+      LowerIntake.spin(reverse);
+      wait(0.2,seconds);
+      LowerIntake.spin(forward);
+      wait(1.0,seconds);
+      DescorerAndHood.set(true);
+      RotateToHeading(185,100,1000);
+      //To Matchloader
+      DistanceDrive(45,40,false);
+      wait(1.5,seconds);
+      DistanceDrive(-1,100,false);
+      wait(0.3,seconds);
+      DistanceDrive(3,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(-1,100,false);
+      wait(0.3,seconds);
+      DistanceDrive(2,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(-1,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(2,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(-1,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(3,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(-1,100,false);
+      wait(0.4,seconds);
+       DistanceDrive(2,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(-1,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(3,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(-1,100,false);
+      wait(1,seconds);
+      //To long goal again
+      RotateToHeading(178,100,2000);
+      DriveToPt(118,45,100,5,1500,false);
+      wait(0.55,seconds);
+      DescorerAndHood.set(false);
+      wait(0.8,seconds);
+      LowerIntake.spin(reverse);
+      wait(0.3,seconds);
+      LowerIntake.spin(forward);
+      wait(2.0,seconds);
+      //Place Descorer in goal and move slowly
+      UpperIntake.setVelocity(100,percent);
+      UpperIntake.spin(reverse);
+      DescorerAndHood.set(false);
+      wait(1.5,seconds);
+      DistanceDrive(10,30,false);
+      DescorerAndHood.set(true);
+      wait(0.5,seconds);
+      //RotateToHeading(135,100,2000);
+      DistanceDrive(-19,100,false);
+      MatchLoader.set(false);
+      wait(1,seconds);
+      //Go to park zone
+      RotateToHeading(210,35,3000);
+      DistanceDrive(185,50,false);
+      wait(2.0,seconds);
+      RotateToHeading(85,100,2000);
+     // MatchLoader.set(true);
+      DoubleParkButton.set(true);
+      DistanceDrive(5,100,false);
+      wait(1,seconds);
+      DistanceDrive(-60,100,true);
+      wait(1,seconds);
+      DistanceDrive(10,100,false);
+      wait(0.4,seconds);
+      DistanceDrive(-20,100,false);
+      MatchLoader.set(false);
+    }
+    void ParkAnClear(){
+      DoubleParkButton.set(true);
+      //DistanceDrive(10,20,false);
+      //wait(1.0,seconds);
+      DistanceDrive(-40,60,false);
+      wait(1,seconds);
+      DistanceDrive(16.5,60,false);
+    
+
+    } 
+    void GetOutTheWay() {
+      DistanceDrive(200,70,false);
+    }
+    void SkillsPark(){
+      InertialSensor.setHeading(180,degrees);
+      wait(0.5,seconds);
+      RotateToHeading(160,100,1000);
+      DistanceDrive(250,100,false);
+      wait(1.0,seconds);
+      RotateToHeading(270,100,1500);
+    
+
+    }
+  //variable to determine what is picked 1 = Left, 2 = Right, 3 = Left Elims, 4 = Right Elims, 5= Skills
+    
+  void AutonConditions() {
+    if (Mode ==1 ){
+      Left();
+    }
+    if (Mode == 2 ){
+      Right();
+    }
+    if (Mode == 3 ){
+      LeftElims();
+    }
+    if (Mode == 4 ){
+      RightElims();
+    }
+    if (Mode == 5 ){
+      GetOutTheWay();
+    }
+  }
+
+int onauton_autonomous_0() {
+    AutonConditions();
+    //RightWing();
+   //Right();
+    //Left();
+    //LeftElims();
+    //RedLeft();
+    //RightElims();
+    //Skills1loader();
+    //Skills2loaders();
+    //BlueLeft();
+     //ParkAnClear();
+  return 0;
+}
+//Autonomous setup code 
+  void VEXcode_auton_task() {
+  // Start the auton control tasks....
+  vex::task auto0(onauton_autonomous_0);
+  while(Competition.isAutonomous() && Competition.isEnabled()) {this_thread::sleep_for(10);}
+  auto0.stop();
+  return;
+  }
+
+//Odometry points code
+  void OdometryPointsTest(){
+    Controller1.Screen.print("X: %.2f",X);
+    Controller1.Screen.print("Y: %.2f",Y);
+    Brain.Screen.newLine();
+  }
+
+int main() {
+   ColorSensor.setLight(ledState::on);
+   wait(0.2,seconds);
+  X=0;
+  Y=0;
+  //variables that are set one in the 
+    DoubleParkButton.set(false);
+   //MatchLoader.set(false);
+  //Robot Configuration. DO NOT REMOVE!
+    vexcodeInit();
+  //Vex Competition stuff(who knows what it is)
+    vex::competition::bStopTasksBetweenModes = false;
+    AutonomousSelector();
+    Competition.autonomous(VEXcode_auton_task);
+    Competition.drivercontrol(VEXcode_driver_task);
+
+  //Button Controls Begin project code
+    Controller1.Axis2.changed(RightSideControl);
+    Controller1.Axis3.changed(LeftSideControl);  
+  //Intake code
+    Controller1.ButtonL2.pressed(L1ButtonPressed);
+    Controller1.ButtonL2.released(StopIntakeMotors);
+    Controller1.ButtonL1.pressed(R1ButtonPressed);
+    Controller1.ButtonL1.released(StopIntakeMotors);
+    Controller1.ButtonR1.pressed(L2ButtonPressed);
+    Controller1.ButtonR1.released(StopIntakeMotors);
+  //Pneumatics
+    Controller1.ButtonR2.pressed(MatchLoaderButton);
+
+    //Bottom goal scoring
+    Controller1.ButtonB.pressed(DescorerAndHoodControl);
+    //controls the Double Park
+    Controller1.ButtonDown.pressed(DoublePark);
+    //Automatic Program to just park
+    Controller1.ButtonUp.pressed(SkillsPark);
+    
+  //threads
+    //thread for Odometry
+    thread mythread(Odometry);
+    //thread for tempature reading////////////////////////////////////////////////
+    thread mythread1(TempatureReadout);
+  //thread for Color Sensing
+    //while (true) {
+      //ColorSorting();
+      
+    //}
+}
